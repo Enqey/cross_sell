@@ -7,8 +7,8 @@ from itertools import combinations
 # -------------------------------
 # Load dataset
 # -------------------------------
-file_path = r"C:\Users\Lenovo\Downloads\Sdata.csv"
-df = pd.read_csv(file_path, parse_dates=['Order Date', 'Ship Date'])
+data_url = 'https://github.com/Enqey/cross_sell/blob/main/Sdata.csv'  # GitHub raw link
+df = pd.read_csv(data_url, parse_dates=['Order Date', 'Ship Date'])
 
 
 # Filter orders with at least 3 unique products
@@ -95,3 +95,4 @@ def suggest(request: ProductRequest):
     if not suggestions:
         raise HTTPException(status_code=404, detail="No cross-selling suggestions found for this product")
     return {"product": request.product_name, "suggestions": suggestions}
+
