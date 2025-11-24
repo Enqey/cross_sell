@@ -1,36 +1,24 @@
-# -*- coding: utf-8 -*-
-"""
-Cross-selling Streamlit App
-"""
-
+# api_cross_sell.py
+from fastapi import FastAPI, HTTPException
+from pydantic import BaseModel
 import pandas as pd
-import streamlit as st
 from itertools import combinations
 
 # -------------------------------
 # Load dataset
 # -------------------------------
-data_url = 'https://github.com/Enqey/cross_sell/blob/main/Sdata.csv'  # GitHub raw link
-df = pd.read_csv(data_url, parse_dates=['Order Date', 'Ship Date'])
+file_path = r"C:\Users\Lenovo\Downloads\Sdata.csv"
+df = pd.read_csv(file_path, parse_dates=['Order Date', 'Ship Date'])
 
-st.title("🛒 Cross-Selling Product Suggestions")
-st.write("""
-    **Select a product and see what other products are often bought together!**
-""")
 
-# -------------------------------
 # Filter orders with at least 3 unique products
-# -------------------------------
 order_counts = df.groupby('Order ID')['Product ID'].nunique()
 orders_with_3plus = order_counts[order_counts >= 3].index
 df_filtered = df[df['Order ID'].isin(orders_with_3plus)].copy()
 df_filtered['date_'] = df_filtered['Order Date'].dt.date
 
-# -------------------------------
 # Generate 3-item combinations
-# -------------------------------
 records = []
-
 for order_id, group in df_filtered.groupby('Order ID'):
     items = group[['Product ID', 'Product Name']].drop_duplicates().values
     if len(items) < 3:
@@ -60,32 +48,29 @@ cross_sell_summary = (
 )
 
 # -------------------------------
-# Sidebar for product selection
+# FastAPI app
 # -------------------------------
-product_names = pd.unique(df['Product Name'])
-selected_product = st.sidebar.selectbox("Select a product:", product_names)
+app = FastAPI(title="Cross-Selling API")
 
-# -------------------------------
-# Show cross-selling suggestions
-# -------------------------------
-if selected_product:
-    st.subheader(f"Products frequently bought with: {selected_product}")
+class ProductRequest(BaseModel):
+    product_name: str
 
-    # Filter all combinations that contain the selected product
+def get_cross_sell_suggestions(selected_product: str):
     mask = (
         (cross_sell_summary['product_name1'] == selected_product) |
         (cross_sell_summary['product_name2'] == selected_product) |
         (cross_sell_summary['product_name3'] == selected_product)
     )
-
     suggestions = cross_sell_summary[mask].copy()
+    if suggestions.empty:
+        return []
 
-    # Extract the other products in the combination
-    def get_other_products(row, selected):
-        return [p for p in [row['product_name1'], row['product_name2'], row['product_name3']] if p != selected]
+    # Extract other products
+    def get_other_products(row):
+        return [p for p in [row['product_name1'], row['product_name2'], row['product_name3']] if p != selected_product]
 
-    suggestions['cross_sell_products'] = suggestions.apply(lambda row: get_other_products(row, selected_product), axis=1)
-
+    suggestions['cross_sell_products'] = suggestions.apply(lambda row: get_other_products(row), axis=1)
+    
     # Aggregate by frequency
     final_suggestions = (
         suggestions.explode('cross_sell_products')
@@ -94,13 +79,19 @@ if selected_product:
         .reset_index()
         .sort_values(by='frequency', ascending=False)
     )
+    
+    # Convert to list of dicts
+    return final_suggestions.to_dict(orient='records')
 
-    if not final_suggestions.empty:
-        for idx, row in final_suggestions.iterrows():
-            st.write(f"{row['cross_sell_products']} (bought together {row['frequency']} times)")
-    else:
-        st.write("No cross-selling suggestions found.")
 
-st.write("---")
-st.write("**Developed by Nana Ekow Okusu**")
+@app.get("/")
+def root():
+    return {"message": "Welcome to Cross-Selling API. Use /suggest endpoint."}
 
+
+@app.post("/suggest")
+def suggest(request: ProductRequest):
+    suggestions = get_cross_sell_suggestions(request.product_name)
+    if not suggestions:
+        raise HTTPException(status_code=404, detail="No cross-selling suggestions found for this product")
+    return {"product": request.product_name, "suggestions": suggestions}
