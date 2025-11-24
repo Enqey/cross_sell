@@ -10,7 +10,7 @@ from itertools import combinations
 # -------------------------------
 # Load dataset
 # -------------------------------
-data_url = 'https://raw.githubusercontent.com/Enqey/Recmodel/main/Sdata.csv'  # GitHub raw link
+data_url = 'https://github.com/Enqey/cross_sell/blob/main/Sdata.csv'  # GitHub raw link
 df = pd.read_csv(data_url, parse_dates=['Order Date', 'Ship Date'])
 
 st.title("🛒 Cross-Selling Product Suggestions")
@@ -103,3 +103,4 @@ if selected_product:
 
 st.write("---")
 st.write("**Developed by Nana Ekow Okusu**")
+
